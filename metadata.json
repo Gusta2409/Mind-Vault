@@ -1,0 +1,8 @@
+{
+  "name": "Mind Vault - Intelligent Knowledge Base",
+  "description": "A minimalist, Obsidian-inspired knowledge management system featuring markdown notes, hierarchical folders, interactive graph visualization, and a creative canvas for linking ideas.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
