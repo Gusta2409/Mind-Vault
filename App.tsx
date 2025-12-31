@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FolderIcon, 
   FileText, 
@@ -11,7 +11,11 @@ import {
   Menu,
   Zap,
   PenTool,
-  X
+  X,
+  Cloud,
+  CloudOff,
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import { Note, Folder, ViewMode, AppState } from './types';
 import Sidebar from './components/Sidebar';
@@ -19,11 +23,11 @@ import Editor from './components/Editor';
 import GraphView from './components/GraphView';
 import CanvasView from './components/CanvasView';
 import BlackboardView from './components/BlackboardView';
+import { GoogleDriveService } from './services/googleDrive';
 
 const Logo = () => (
   <div className="relative w-9 h-9 md:w-10 md:h-10 shrink-0 overflow-hidden rounded-xl shadow-lg shadow-indigo-500/20 bg-gradient-to-br from-[#8a3391] via-[#5b32a3] to-[#2d3a8c] flex items-center justify-center">
     <svg viewBox="0 0 100 100" className="w-7 h-7 md:w-8 md:h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Brain Outline Stylized */}
       <path 
         d="M50 85C35 85 22 75 18 62C12 60 8 54 8 47C8 38 15 31 23 31C23 20 32 12 43 12C48 12 52 14 55 17C58 14 62 12 67 12C78 12 87 20 87 31C95 31 102 38 102 47C102 54 98 60 92 62C88 75 75 85 60 85H50Z" 
         stroke="white" 
@@ -33,7 +37,6 @@ const Logo = () => (
         className="opacity-90"
       />
       <circle cx="50" cy="48" r="16" fill="#3a2a7a" stroke="white" strokeWidth="2" />
-      {/* Keyhole */}
       <path 
         d="M50 40C48.3431 40 47 41.3431 47 43C47 44.2536 47.7712 45.3268 48.865 45.7535L46.5 53H53.5L51.135 45.7535C52.2288 45.3268 53 44.2536 53 43C53 41.3431 51.6569 40 50 40Z" 
         fill="#FFD700"
@@ -62,15 +65,72 @@ const App: React.FC = () => {
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
+  const [cloudStatus, setCloudStatus] = useState<'disconnected' | 'connecting' | 'synced' | 'syncing'>('disconnected');
 
-  // Auto-close sidebar on small screens when view mode changes
-  useEffect(() => {
-    if (window.innerWidth < 768 && state.viewMode !== 'editor') {
-      setIsSidebarOpen(false);
+  const syncWithDrive = useCallback(async (data: AppState) => {
+    if (cloudStatus !== 'synced') return;
+    setCloudStatus('syncing');
+    try {
+      const folderId = await GoogleDriveService.findOrCreateFolder('Mind Vault');
+      await GoogleDriveService.saveFile(folderId, 'vault_data.json', data);
+      setCloudStatus('synced');
+    } catch (err) {
+      console.error('Drive Sync Error:', err);
+      // Mantém status sincronizado para tentar novamente no próximo intervalo
+      setCloudStatus('synced');
     }
-  }, [state.viewMode]);
+  }, [cloudStatus]);
 
-  // Sync theme class to HTML element
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (cloudStatus === 'synced') syncWithDrive(state);
+    }, 5000); 
+    return () => clearTimeout(timer);
+  }, [state, cloudStatus, syncWithDrive]);
+
+  const connectToDrive = async () => {
+    // Se não houver Client ID configurado (DEFAULT_CLIENT_ID), pede ao administrador/usuário.
+    // Em produção, você deixaria o DEFAULT_CLIENT_ID preenchido no service.
+    let clientId = state.googleClientId || GoogleDriveService.DEFAULT_CLIENT_ID;
+    
+    if (!clientId) {
+      clientId = prompt("Admin: Insira o Google Client ID da sua aplicação Web:") || "";
+      if (clientId) {
+        setState(prev => ({ ...prev, googleClientId: clientId }));
+      } else {
+        return;
+      }
+    }
+
+    setCloudStatus('connecting');
+    try {
+      await GoogleDriveService.init(clientId);
+      const authed = await GoogleDriveService.authenticate();
+      if (authed) {
+        const folderId = await GoogleDriveService.findOrCreateFolder('Mind Vault');
+        const remoteData = await GoogleDriveService.readFile(folderId, 'vault_data.json');
+        if (remoteData) {
+          if (confirm("Dados encontrados no seu Google Drive. Deseja carregar agora?\n(Isso substituirá suas notas locais por esta versão da nuvem)")) {
+            setState(remoteData);
+          }
+        }
+        setCloudStatus('synced');
+      } else {
+        setCloudStatus('disconnected');
+        alert("Autenticação cancelada ou falhou.");
+      }
+    } catch (err: any) {
+      console.error("Connection error:", err);
+      alert("Erro crítico na conexão: " + err.message + "\n\nVerifique se o Client ID está correto e se o domínio atual está autorizado no Google Cloud Console.");
+      setCloudStatus('disconnected');
+    }
+  };
+
+  const logoutDrive = async () => {
+    await GoogleDriveService.logout();
+    setCloudStatus('disconnected');
+  };
+
   useEffect(() => {
     const root = window.document.documentElement;
     if (state.theme === 'dark') {
@@ -107,7 +167,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#0d1117] text-gray-900 dark:text-gray-100 overflow-hidden transition-colors duration-300 relative">
-      {/* Sidebar - Drawer no Mobile (Z-INDEX ALTO), Inline no Desktop */}
       <div className={`
         fixed md:relative inset-y-0 left-0 z-[1000]
         ${isSidebarOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full md:w-0'} 
@@ -119,11 +178,13 @@ const App: React.FC = () => {
             setState={setState} 
             createNote={createNote}
             closeSidebar={() => setIsSidebarOpen(false)}
+            connectDrive={connectToDrive}
+            logoutDrive={logoutDrive}
+            cloudStatus={cloudStatus}
           />
         )}
       </div>
 
-      {/* Overlay para fechar sidebar no mobile (Z-INDEX ALTO) */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-[900] md:hidden"
@@ -131,7 +192,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         <header className="flex flex-col md:flex-row md:h-16 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0d1117] z-30">
           <div className="flex items-center justify-between px-4 py-3 md:py-0 md:px-6">
@@ -151,6 +211,13 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
+            
+            {cloudStatus !== 'disconnected' && (
+              <div className="md:hidden flex items-center space-x-2 px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-full text-[10px] font-bold">
+                {cloudStatus === 'syncing' || cloudStatus === 'connecting' ? <RefreshCw size={10} className="animate-spin" /> : <Cloud size={10} />}
+                <span>{cloudStatus === 'syncing' ? 'Salvando' : cloudStatus === 'connecting' ? 'Conectando' : 'Nuvem OK'}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 flex items-center px-4 pb-3 md:pb-0 md:px-4 overflow-x-auto no-scrollbar">

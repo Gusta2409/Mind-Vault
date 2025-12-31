@@ -53,4 +53,5 @@ export interface AppState {
   theme: 'light' | 'dark';
   canvasElements: CanvasElement[];
   canvasEdges: CanvasEdge[];
+  googleClientId?: string; // Novo campo para configuração dinâmica
 }
