@@ -256,6 +256,8 @@ const App: React.FC = () => {
             <Editor 
               note={activeNote} 
               allNotes={state.notes}
+              // Passed theme prop to Editor component
+              theme={state.theme}
               onNavigate={(id) => setState(prev => ({...prev, currentNoteId: id}))}
               onUpdate={(u) => setState(prev => ({...prev, notes: prev.notes.map(n => n.id === activeNote.id ? {...n, ...u, updatedAt: Date.now()} : n)}))} 
               onDelete={() => setState(p => ({...p, notes: p.notes.filter(n => n.id !== activeNote.id), currentNoteId: p.notes[0]?.id || null}))}

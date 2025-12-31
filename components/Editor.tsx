@@ -21,12 +21,15 @@ import { GoogleGenAI } from "@google/genai";
 interface EditorProps {
   note: Note;
   allNotes: Note[];
+  // Added theme prop to interface
+  theme: 'light' | 'dark';
   onUpdate: (updates: Partial<Note>) => void;
   onDelete: () => void;
   onNavigate: (id: string) => void;
 }
 
-const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onNavigate }) => {
+// Destructured theme from props
+const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDelete, onNavigate }) => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const lastRangeRef = useRef<Range | null>(null);
@@ -195,8 +198,8 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-[#0d1117] relative">
-      {/* TOOLBAR COM Z-INDEX CONTROLADO PARA NÃO SOBREPOR SIDEBAR */}
-      <div className="flex flex-col border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d1117] z-20 relative">
+      {/* Barra de Ferramentas - z-40 para garantir que sobreponha o conteúdo */}
+      <div className="flex flex-col border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d1117] z-40 relative">
         <div className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3">
           <div className="flex items-center space-x-4 text-[10px] md:text-xs text-gray-400">
             <div className="flex items-center space-x-1">
@@ -222,7 +225,8 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
           </div>
         </div>
 
-        <div className="flex items-center flex-wrap gap-1 px-4 md:px-6 pb-2 md:pb-3 relative overflow-x-auto no-scrollbar">
+        {/* Linha de Botões - overflow-visible é CRUCIAL para os menus suspensos */}
+        <div className="flex items-center flex-wrap gap-1 px-4 md:px-6 pb-2 md:pb-3 relative overflow-visible">
           <div className="flex items-center space-x-0.5">
             <button onMouseDown={(e) => { e.preventDefault(); execCommand('bold'); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-600 dark:text-gray-300 transition-colors" title="Negrito">
               <Bold size={16} />
@@ -253,7 +257,7 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
                   <button
                     key={sz.value}
                     onMouseDown={(e) => { e.preventDefault(); execCommand('fontSize', sz.value); setIsSizeMenuOpen(false); }}
-                    className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors"
+                    className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors text-gray-700 dark:text-gray-200"
                   >
                     {sz.label}
                   </button>
@@ -279,8 +283,9 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
                     <button
                       key={c.name}
                       onMouseDown={(e) => { e.preventDefault(); execCommand('foreColor', c.color); setIsColorMenuOpen(false); }}
-                      className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 transition-transform hover:scale-110 active:scale-95"
-                      style={{ backgroundColor: c.color === 'inherit' ? (note.content.includes('dark') ? 'white' : 'black') : c.color }}
+                      className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 transition-transform hover:scale-110 active:scale-95 shadow-sm"
+                      // Fixed 'state.theme' error by using 'theme' prop passed from App.tsx
+                      style={{ backgroundColor: c.color === 'inherit' ? (theme === 'dark' ? 'white' : 'black') : c.color }}
                       title={c.name}
                     />
                   ))}
@@ -300,14 +305,14 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
           </button>
 
           {isLinkMenuOpen && (
-            <div className="absolute top-full left-4 md:left-6 mt-2 w-[calc(100vw-2rem)] md:w-72 max-w-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] p-3 animate-in fade-in slide-in-from-top-2">
+            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] p-3 animate-in fade-in slide-in-from-top-2">
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input 
                   autoFocus
                   type="text" 
                   placeholder="Pesquisar notas..."
-                  className="w-full bg-gray-100 dark:bg-gray-700/50 text-xs pl-9 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full bg-gray-100 dark:bg-gray-700/50 text-xs pl-9 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900 dark:text-white"
                   value={linkSearch}
                   onChange={(e) => setLinkSearch(e.target.value)}
                 />
@@ -320,10 +325,10 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
                     className="w-full flex items-center space-x-3 p-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors text-left"
                   >
                     <FileText size={14} className="text-gray-400" />
-                    <span className="text-xs font-bold truncate">{n.title}</span>
+                    <span className="text-xs font-bold truncate text-gray-700 dark:text-gray-200">{n.title}</span>
                   </button>
                 )) : (
-                  <p className="text-[10px] text-center text-gray-500 py-6 uppercase font-black tracking-widest">Vazio</p>
+                  <p className="text-[10px] text-center text-gray-500 py-6 uppercase font-black tracking-widest">Nenhuma nota encontrada</p>
                 )}
               </div>
             </div>
@@ -331,7 +336,8 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, onUpdate, onDelete, onN
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-12 md:py-12 no-scrollbar">
+      {/* Área do Editor */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-12 md:py-12 no-scrollbar z-10">
         <div className="max-w-3xl mx-auto">
           <input 
             type="text"
