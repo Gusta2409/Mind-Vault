@@ -21,14 +21,12 @@ import { GoogleGenAI } from "@google/genai";
 interface EditorProps {
   note: Note;
   allNotes: Note[];
-  // Added theme prop to interface
   theme: 'light' | 'dark';
   onUpdate: (updates: Partial<Note>) => void;
   onDelete: () => void;
   onNavigate: (id: string) => void;
 }
 
-// Destructured theme from props
 const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDelete, onNavigate }) => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -162,23 +160,22 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDele
   };
 
   const askAiForHelp = async () => {
-    if (!process.env.API_KEY) {
-      alert("Recurso AI requer uma API Key configurada.");
-      return;
-    }
-    
+    // Assumption: process.env.API_KEY is pre-configured, valid, and accessible in the execution context
     setIsAiLoading(true);
     try {
+      // Create a new instance right before making an API call to ensure it uses the most up-to-date API key
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const currentText = editorRef.current?.innerText || "";
+      // Use 'gemini-3-pro-preview' for complex text tasks like professional research assistance
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: `Você é um assistente de escrita. Com base no título "${title}" e conteúdo "${currentText}", forneça 3 pontos para melhorar ou expandir esta nota. Saída APENAS em formato HTML (<ul><li>...).`,
         config: {
           systemInstruction: "Você é um assistente profissional de pesquisa. Ajude o usuário a melhorar suas notas com fatos relevantes e sugestões estruturais."
         }
       });
       
+      // Directly access .text property from GenerateContentResponse
       const aiText = response.text;
       if (aiText && editorRef.current) {
         editorRef.current.innerHTML += "<br><hr class='my-8 border-gray-100 dark:border-white/5'><br><h3>✨ Sugestões da IA:</h3>" + aiText;
@@ -197,9 +194,9 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDele
     .slice(0, 5);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#0d1117] relative">
-      {/* Barra de Ferramentas - z-40 para garantir que sobreponha o conteúdo */}
-      <div className="flex flex-col border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d1117] z-40 relative">
+    <div className="flex flex-col h-full bg-white dark:bg-[#0d1117] relative isolation-auto">
+      {/* Barra de Ferramentas - Aumentado para z-50 e garantindo overflow visível */}
+      <div className="flex flex-col border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0d1117] z-50 relative shadow-sm">
         <div className="flex items-center justify-between px-4 md:px-6 py-2 md:py-3">
           <div className="flex items-center space-x-4 text-[10px] md:text-xs text-gray-400">
             <div className="flex items-center space-x-1">
@@ -225,7 +222,7 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDele
           </div>
         </div>
 
-        {/* Linha de Botões - overflow-visible é CRUCIAL para os menus suspensos */}
+        {/* Linha de Botões - overflow-visible para permitir menus flutuantes */}
         <div className="flex items-center flex-wrap gap-1 px-4 md:px-6 pb-2 md:pb-3 relative overflow-visible">
           <div className="flex items-center space-x-0.5">
             <button onMouseDown={(e) => { e.preventDefault(); execCommand('bold'); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-gray-600 dark:text-gray-300 transition-colors" title="Negrito">
@@ -252,7 +249,7 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDele
               <ChevronDown size={10} />
             </button>
             {isSizeMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] p-1.5 animate-in fade-in slide-in-from-top-1">
+              <div className="absolute top-full left-0 mt-2 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.4)] z-[100] p-1.5 animate-in fade-in slide-in-from-top-1 backdrop-blur-xl">
                 {fontSizes.map((sz) => (
                   <button
                     key={sz.value}
@@ -277,14 +274,13 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDele
               <ChevronDown size={10} />
             </button>
             {isColorMenuOpen && (
-              <div className="absolute top-full left-0 mt-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] p-2 animate-in fade-in slide-in-from-top-1">
+              <div className="absolute top-full left-0 mt-2 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.4)] z-[100] p-2 animate-in fade-in slide-in-from-top-1 backdrop-blur-xl">
                 <div className="grid grid-cols-5 gap-2 p-1">
                   {textColors.map((c) => (
                     <button
                       key={c.name}
                       onMouseDown={(e) => { e.preventDefault(); execCommand('foreColor', c.color); setIsColorMenuOpen(false); }}
                       className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 transition-transform hover:scale-110 active:scale-95 shadow-sm"
-                      // Fixed 'state.theme' error by using 'theme' prop passed from App.tsx
                       style={{ backgroundColor: c.color === 'inherit' ? (theme === 'dark' ? 'white' : 'black') : c.color }}
                       title={c.name}
                     />
@@ -296,48 +292,50 @@ const Editor: React.FC<EditorProps> = ({ note, allNotes, theme, onUpdate, onDele
 
           <div className="w-px h-6 bg-gray-100 dark:bg-gray-800 mx-1" />
           
-          <button 
-            onMouseDown={(e) => { e.preventDefault(); saveSelection(); setIsLinkMenuOpen(!isLinkMenuOpen); setIsColorMenuOpen(false); setIsSizeMenuOpen(false); }} 
-            className={`p-2 rounded-xl transition-colors ${isLinkMenuOpen ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
-            title="Vincular Nota Interna"
-          >
-            <FileSearch size={16} />
-          </button>
+          <div className="relative">
+            <button 
+              onMouseDown={(e) => { e.preventDefault(); saveSelection(); setIsLinkMenuOpen(!isLinkMenuOpen); setIsColorMenuOpen(false); setIsSizeMenuOpen(false); }} 
+              className={`p-2 rounded-xl transition-colors ${isLinkMenuOpen ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+              title="Vincular Nota Interna"
+            >
+              <FileSearch size={16} />
+            </button>
 
-          {isLinkMenuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] p-3 animate-in fade-in slide-in-from-top-2">
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                <input 
-                  autoFocus
-                  type="text" 
-                  placeholder="Pesquisar notas..."
-                  className="w-full bg-gray-100 dark:bg-gray-700/50 text-xs pl-9 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900 dark:text-white"
-                  value={linkSearch}
-                  onChange={(e) => setLinkSearch(e.target.value)}
-                />
+            {isLinkMenuOpen && (
+              <div className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.4)] z-[100] p-3 animate-in fade-in slide-in-from-top-2 backdrop-blur-xl">
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                  <input 
+                    autoFocus
+                    type="text" 
+                    placeholder="Pesquisar notas..."
+                    className="w-full bg-gray-100 dark:bg-gray-700/50 text-xs pl-9 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-gray-900 dark:text-white"
+                    value={linkSearch}
+                    onChange={(e) => setLinkSearch(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1 max-h-60 overflow-y-auto no-scrollbar">
+                  {filteredNotes.length > 0 ? filteredNotes.map(n => (
+                    <button
+                      key={n.id}
+                      onClick={() => insertInternalLink(n)}
+                      className="w-full flex items-center space-x-3 p-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors text-left"
+                    >
+                      <FileText size={14} className="text-gray-400" />
+                      <span className="text-xs font-bold truncate text-gray-700 dark:text-gray-200">{n.title}</span>
+                    </button>
+                  )) : (
+                    <p className="text-[10px] text-center text-gray-500 py-6 uppercase font-black tracking-widest">Nenhuma nota encontrada</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-1 max-h-60 overflow-y-auto no-scrollbar">
-                {filteredNotes.length > 0 ? filteredNotes.map(n => (
-                  <button
-                    key={n.id}
-                    onClick={() => insertInternalLink(n)}
-                    className="w-full flex items-center space-x-3 p-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors text-left"
-                  >
-                    <FileText size={14} className="text-gray-400" />
-                    <span className="text-xs font-bold truncate text-gray-700 dark:text-gray-200">{n.title}</span>
-                  </button>
-                )) : (
-                  <p className="text-[10px] text-center text-gray-500 py-6 uppercase font-black tracking-widest">Nenhuma nota encontrada</p>
-                )}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Área do Editor */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-12 md:py-12 no-scrollbar z-10">
+      {/* Área do Editor - z-0 para garantir que a barra de ferramentas (z-50) e seus menus (z-100) fiquem por cima */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-12 md:py-12 no-scrollbar z-0 relative">
         <div className="max-w-3xl mx-auto">
           <input 
             type="text"
